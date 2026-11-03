@@ -216,15 +216,18 @@ final class CmdCaptureTask {
         guard openpty(&master, &slave, nil, nil, &windowSize) == 0 else { return "" }
         defer { close(master); if slave >= 0 { close(slave) } }
         // Keep terminal-size ioctls available without waiting for input in an unattended host.
+        // The sandboxed screen saver host denies these terminal attribute calls, so tuning is best effort:
+        // the command still runs with the terminal defaults, and the scene normalizes CRLF line endings.
         var inputSettings = termios()
-        guard tcgetattr(slave, &inputSettings) == 0 else { return "" }
-        inputSettings.c_lflag &= ~tcflag_t(ICANON | ECHO)
-        inputSettings.c_oflag &= ~tcflag_t(OPOST)
-        withUnsafeMutableBytes(of: &inputSettings.c_cc) {
-            $0[Int(VMIN)] = 0
-            $0[Int(VTIME)] = 0
+        if tcgetattr(slave, &inputSettings) == 0 {
+            inputSettings.c_lflag &= ~tcflag_t(ICANON | ECHO)
+            inputSettings.c_oflag &= ~tcflag_t(OPOST)
+            withUnsafeMutableBytes(of: &inputSettings.c_cc) {
+                $0[Int(VMIN)] = 0
+                $0[Int(VTIME)] = 0
+            }
+            _ = tcsetattr(slave, TCSANOW, &inputSettings)
         }
-        guard tcsetattr(slave, TCSANOW, &inputSettings) == 0 else { return "" }
         guard fcntl(master, F_SETFD, FD_CLOEXEC) == 0,
               fcntl(slave, F_SETFD, FD_CLOEXEC) == 0,
               fcntl(master, F_SETFL, O_NONBLOCK) == 0 else { return "" }
