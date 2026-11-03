@@ -115,6 +115,24 @@ struct CmdCaptureScene {
     private static let escapeSequences = try! NSRegularExpression(
         pattern: #"\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007\u001B]*(?:\u0007|\u001B\\)?|[ -/]+[0-~]|[0-~])"#)
 
+    /// Adds a UTF-8 `LANG` from the system locale when the host environment sets no locale.
+    ///
+    /// Screen savers and login items start with launchd's bare environment, so tools would
+    /// otherwise report the `C` locale instead of the one a terminal shows.
+    ///
+    /// - Parameters:
+    ///   - environment: Variables inherited from the host process.
+    ///   - localeIdentifier: System locale such as `en_AU`.
+    /// - Returns: The environment, with `LANG` added only if `LANG`, `LC_ALL` and `LC_CTYPE` are unset.
+    static func environmentWithLocale(_ environment: [String: String],
+                                      localeIdentifier: String = Locale.current.identifier) -> [String: String] {
+        var result = environment
+        let unset = ["LANG", "LC_ALL", "LC_CTYPE"].allSatisfy { (result[$0] ?? "").isEmpty }
+        let base = localeIdentifier.split(separator: "@").first.map(String.init) ?? ""
+        if unset, !base.isEmpty { result["LANG"] = base + ".UTF-8" }
+        return result
+    }
+
     /// Removes terminal escape sequences so colors and titles are not drawn as stray characters
     /// and do not count toward the row width.
     ///
@@ -261,7 +279,7 @@ final class CmdCaptureTask {
               posix_spawn_file_actions_adddup2(&actions, slave, STDOUT_FILENO) == 0,
               posix_spawn_file_actions_adddup2(&actions, slave, STDERR_FILENO) == 0 else { return "" }
 
-        var environment = ProcessInfo.processInfo.environment
+        var environment = CmdCaptureScene.environmentWithLocale(ProcessInfo.processInfo.environment)
         environment["COLUMNS"] = String(windowSize.ws_col)
         environment["LINES"] = String(windowSize.ws_row)
         let existingPath = environment["PATH"] ?? ""

@@ -76,6 +76,12 @@ func cmdCaptureSceneTests() {
     emptyOutputScene.receiveCapture("", maxLines: 10, maxColumns: 50, now: 201)
     ok(emptyOutputScene.lines == ["(no output)"], "CmdCaptureScene: empty output falls back to placeholder")
 
+    ok(CmdCaptureScene.environmentWithLocale(["PATH": "/bin"], localeIdentifier: "en_AU")["LANG"] == "en_AU.UTF-8",
+       "locale: LANG is added from the system locale when unset")
+    ok(CmdCaptureScene.environmentWithLocale(["LANG": "fr_FR.UTF-8"], localeIdentifier: "en_AU")["LANG"] == "fr_FR.UTF-8",
+       "locale: an existing LANG is kept")
+    ok(CmdCaptureScene.environmentWithLocale(["LC_ALL": "C"], localeIdentifier: "en_AU")["LANG"] == nil,
+       "locale: LANG is not added when LC_ALL is set")
     ok(CmdCaptureScene.strippingEscapeSequences(from: "\u{1B}[1m\u{1B}[32mgreen\u{1B}[0m plain") == "green plain",
        "CmdCaptureScene: color escape sequences are stripped")
     ok(CmdCaptureScene.strippingEscapeSequences(from: "\u{1B}]0;title\u{07}text\u{1B}[2K\u{1B}(B") == "text",
