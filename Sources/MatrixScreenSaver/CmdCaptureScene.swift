@@ -96,7 +96,8 @@ struct CmdCaptureScene {
         guard !output.isEmpty || isComplete else { return }
         viewportRows = max(maxLines, 1)
         viewportColumns = max(maxColumns, 1)
-        var rows = output.replacingOccurrences(of: "\r\n", with: "\n")
+        var rows = Self.strippingEscapeSequences(from: output)
+            .replacingOccurrences(of: "\r\n", with: "\n")
             .components(separatedBy: "\n")
         if rows.last == "" { rows.removeLast() }
         lines = (rows.isEmpty ? ["(no output)"] : rows).map {
@@ -108,6 +109,22 @@ struct CmdCaptureScene {
             holdStart = now
         }
         phase = .presenting
+    }
+
+    /// Matches CSI (colors, cursor movement), OSC (titles, hyperlinks), charset selection and two-byte escapes.
+    private static let escapeSequences = try! NSRegularExpression(
+        pattern: #"\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007\u001B]*(?:\u0007|\u001B\\)?|[ -/]+[0-~]|[0-~])"#)
+
+    /// Removes terminal escape sequences so colors and titles are not drawn as stray characters
+    /// and do not count toward the row width.
+    ///
+    /// The scene shows plain text rows, so sequences that move the cursor or redraw the screen are
+    /// dropped rather than emulated.
+    /// - Parameter text: Captured command output.
+    /// - Returns: The output with every escape sequence removed.
+    static func strippingEscapeSequences(from text: String) -> String {
+        escapeSequences.stringByReplacingMatches(
+            in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
     }
 
     /// Excludes a suspended interval without rebuilding the message schedule.

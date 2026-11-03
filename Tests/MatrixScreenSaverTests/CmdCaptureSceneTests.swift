@@ -76,6 +76,18 @@ func cmdCaptureSceneTests() {
     emptyOutputScene.receiveCapture("", maxLines: 10, maxColumns: 50, now: 201)
     ok(emptyOutputScene.lines == ["(no output)"], "CmdCaptureScene: empty output falls back to placeholder")
 
+    ok(CmdCaptureScene.strippingEscapeSequences(from: "\u{1B}[1m\u{1B}[32mgreen\u{1B}[0m plain") == "green plain",
+       "CmdCaptureScene: color escape sequences are stripped")
+    ok(CmdCaptureScene.strippingEscapeSequences(from: "\u{1B}]0;title\u{07}text\u{1B}[2K\u{1B}(B") == "text",
+       "CmdCaptureScene: title, erase and charset escape sequences are stripped")
+    ok(CmdCaptureScene.strippingEscapeSequences(from: "plain é日 text") == "plain é日 text",
+       "CmdCaptureScene: text without escapes is unchanged")
+    var colored = CmdCaptureScene()
+    colored.reset(startTime: 100.0, command: "ls")
+    colored.advance(now: 200)
+    colored.receiveCapture("\u{1B}[31mabcdef\u{1B}[0m\n", maxLines: 5, maxColumns: 4, now: 201)
+    ok(colored.lines == ["abcd"], "CmdCaptureScene: escape sequences do not count toward the clipped row width")
+
     var live = CmdCaptureScene()
     live.reset(startTime: 100, command: "stream", holdDuration: 3)
     live.advance(now: 200)
